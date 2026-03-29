@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nexus Scheduler — DAA Suite</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:        #0f0e17;
+  --bg2:       #13121f;
+  --surface:   #1a1828;
+  --surface2:  #211f32;
+  --raised:    #272542;
+  --border:    #2e2b4a;
+  --border2:   #3a3660;
+  --gold:      #f5a623;
+  --gold2:     #ffc65a;
+  --gold-dim:  #f5a62330;
+  --rose:      #ff6b8a;
+  --mint:      #4ecdc4;
+  --lavender:  #9b8ff5;
+  --text:      #d4d0f0;
+  --text2:     #7a7599;
+  --text3:     #403d5e;
+  --success:   #52e5a0;
+  --danger:    #ff5c5c;
+  --r: 8px;
+}
+
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;font-weight:400;overflow-x:hidden}
+
+/* Ambient glows */
+body::before{content:'';position:fixed;top:-30%;left:-10%;width:60%;height:60%;
+  background:radial-gradient(ellipse,#f5a62308 0%,transparent 70%);pointer-events:none;z-index:0}
+body::after{content:'';position:fixed;bottom:-20%;right:-10%;width:50%;height:50%;
+  background:radial-gradient(ellipse,#9b8ff508 0%,transparent 70%);pointer-events:none;z-index:0}
+
+.shell{position:relative;z-index:1;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+/* ── TOP BAR ── */
+.topbar{
+  height:58px;padding:0 1.75rem;display:flex;align-items:center;gap:1rem;
+  border-bottom:1px solid var(--border);background:#0f0e17f0;
+  backdrop-filter:blur(16px);flex-shrink:0;position:relative;
+}
+.topbar::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--gold-dim),transparent);
+}
+.brand{font-size:1.15rem;font-weight:900;letter-spacing:-0.03em;
+  background:linear-gradient(120deg,var(--gold),var(--gold2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.brand-dot{-webkit-text-fill-color:var(--lavender)}
+.chips{display:flex;gap:6px;margin-left:2px}
+.chip{font-size:0.58rem;padding:3px 9px;border-radius:20px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase}
+.chip-gold{background:var(--gold-dim);color:var(--gold);border:1px solid #f5a62340}
+.chip-lav{background:#9b8ff518;color:var(--lavender);border:1px solid #9b8ff530}
+.chip-mint{background:#4ecdc418;color:var(--mint);border:1px solid #4ecdc430}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.ai-status{display:flex;align-items:center;gap:6px;font-size:0.68rem;color:var(--text2);font-family:'JetBrains Mono',monospace}
+.pulse-ring{width:8px;height:8px;border-radius:50%;background:var(--success);position:relative}
+.pulse-ring::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:1px solid var(--success);animation:ringpulse 2s ease-out infinite}
+@keyframes ringpulse{0%{transform:scale(1);opacity:0.8}100%{transform:scale(2.5);opacity:0}}
+
+/* ── MAIN GRID ── */
+.grid{display:grid;grid-template-columns:310px 1fr 350px;flex:1;overflow:hidden;min-height:0}
+
+/* ── COLUMN BASE ── */
+.col{display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--border)}
+.col:last-child{border-right:none}
+.col-head{
+  padding:0 1.25rem;height:48px;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;
+}
+.col-title{font-size:0.62rem;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:var(--text2)}
+.col-body{flex:1;overflow-y:auto;padding:1.25rem;display:flex;flex-direction:column;gap:1rem}
+.col-body::-webkit-scrollbar{width:3px}
+.col-body::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* ── INPUTS ── */
+.field-group{display:flex;flex-direction:column;gap:3px}
+.field-label{font-size:0.58rem;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:var(--text3)}
+input[type=text],input[type=number]{
+  background:var(--surface2);border:1px solid var(--border);border-radius:6px;
+  padding:8px 11px;font-family:'JetBrains Mono',monospace;font-size:0.75rem;
+  color:var(--text);outline:none;transition:border-color .2s,box-shadow .2s;width:100%;
+}
+input:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-dim)}
+input::placeholder{color:var(--text3)}
+.add-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;align-items:end}
+.add-row-btn{padding-top:22px}
+
+/* ── BUTTONS ── */
+.btn{
+  border:none;border-radius:7px;padding:8px 16px;font-family:'Outfit',sans-serif;font-size:0.78rem;
+  font-weight:600;cursor:pointer;transition:all .18s;display:inline-flex;align-items:center;
+  gap:6px;letter-spacing:0.01em;white-space:nowrap;
+}
+.btn-gold{background:linear-gradient(135deg,var(--gold),#e8941a);color:#1a1400;box-shadow:0 2px 16px #f5a62330}
+.btn-gold:hover{box-shadow:0 4px 24px #f5a62350;transform:translateY(-1px)}
+.btn-outline{background:transparent;color:var(--text2);border:1px solid var(--border2)}
+.btn-outline:hover{background:var(--surface2);color:var(--text);border-color:var(--border2)}
+.btn-ghost{background:transparent;color:var(--text3);border:1px solid transparent}
+.btn-ghost:hover{background:var(--surface2);color:var(--text2)}
+.btn-danger{background:#ff5c5c18;color:var(--danger);border:1px solid #ff5c5c30}
+.btn-danger:hover{background:#ff5c5c28}
+.btn-mint{background:#4ecdc418;color:var(--mint);border:1px solid #4ecdc430}
+.btn-mint:hover{background:#4ecdc428;box-shadow:0 0 16px #4ecdc422}
+.btn-sm{padding:5px 11px;font-size:0.7rem;border-radius:6px}
+.btn-xs{padding:3px 8px;font-size:0.62rem;border-radius:5px}
+.btn:disabled{opacity:0.38;cursor:not-allowed;transform:none!important}
+.btn:active:not(:disabled){transform:scale(0.97)!important}
+
+/* ── SECTION LABELS ── */
+.sec-lbl{font-size:0.6rem;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:var(--text3);margin-bottom:4px}
+
+/* ── PRESETS ── */
+.preset-chips{display:flex;gap:6px;flex-wrap:wrap}
+.preset-chip{
+  font-size:0.65rem;padding:4px 11px;border-radius:20px;cursor:pointer;font-weight:600;
+  background:var(--surface2);border:1px solid var(--border);color:var(--text2);
+  transition:all .18s;font-family:'Outfit',monospace;
+}
+.preset-chip:hover{border-color:var(--gold);color:var(--gold);background:var(--gold-dim)}
+
+/* ── JOB TABLE ── */
+.job-list{display:flex;flex-direction:column;gap:4px}
+.job-row{
+  display:flex;align-items:center;gap:10px;padding:8px 10px;
+  background:var(--surface2);border:1px solid var(--border);border-radius:7px;
+  transition:all .2s;font-size:0.78rem;animation:rowslide .25s ease-out;
+}
+@keyframes rowslide{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
+.job-row:hover{border-color:var(--border2);background:var(--raised)}
+.job-color{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.job-name{font-weight:700;font-family:'JetBrains Mono',monospace;min-width:28px}
+.job-meta{display:flex;gap:8px;font-size:0.7rem;color:var(--text2);margin-left:auto;font-family:'JetBrains Mono',monospace}
+.job-meta span{display:flex;align-items:center;gap:3px}
+.del{background:none;border:none;cursor:pointer;color:var(--text3);font-size:0.75rem;padding:2px 5px;border-radius:4px;transition:all .15s}
+.del:hover{color:var(--danger);background:#ff5c5c15}
+
+/* ── RESULTS ── */
+.results-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.res-tile{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 12px;text-align:center}
+.res-num{font-size:1.5rem;font-weight:900;font-family:'Outfit',sans-serif;line-height:1}
+.res-lbl{font-size:0.58rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3);margin-top:5px}
+.res-num.gold{color:var(--gold);text-shadow:0 0 20px var(--gold-dim)}
+.res-num.mint{color:var(--mint)}
+.res-num.lav{color:var(--lavender)}
+.res-num.red{color:var(--danger)}
+
+/* ── COMPLEXITY ── */
+.cx-table{width:100%}
+.cx-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:0.73rem}
+.cx-row:last-child{border-bottom:none}
+.cx-k{color:var(--text2)}
+.cx-v{font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--gold);font-weight:500}
+
+/* ── CENTER: TABS ── */
+.center-col{display:flex;flex-direction:column;overflow:hidden}
+.tabs{display:flex;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
+.tab{
+  padding:0 20px;height:48px;display:flex;align-items:center;
+  font-size:0.65rem;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;
+  color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;
+  transition:all .18s;position:relative;
+}
+.tab:hover{color:var(--text2);background:var(--surface2)}
+.tab.on{color:var(--gold);border-bottom-color:var(--gold)}
+.tab-pane{flex:1;overflow-y:auto;padding:1.5rem;display:none}
+.tab-pane.on{display:block}
+.tab-pane::-webkit-scrollbar{width:3px}
+.tab-pane::-webkit-scrollbar-thumb{background:var(--border2)}
+
+/* ── STEP VIEW ── */
+.ctrl-bar{display:flex;gap:8px;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap}
+.ctrl-bar .step-ctr{margin-left:auto;font-size:0.68rem;color:var(--text3);font-family:'JetBrains Mono',monospace}
+
+.status-card{
+  border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.25rem;
+  border-left:4px solid var(--gold);background:var(--surface);border:1px solid var(--border);
+  border-left:4px solid var(--gold);font-size:0.82rem;line-height:1.65;
+  animation:fadein .3s ease-out;
+}
+@keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.status-card.ok{border-left-color:var(--success)}
+.status-card.fail{border-left-color:var(--danger);opacity:.85}
+.status-card.done{border-left-color:var(--lavender)}
+.hi-gold{color:var(--gold);font-weight:700}
+.hi-green{color:var(--success);font-weight:600}
+.hi-red{color:var(--danger);font-weight:600}
+.hi-lav{color:var(--lavender);font-weight:600}
+
+/* ── SLOTS ── */
+.slots-wrap{margin-bottom:1.5rem}
+.slots-label{font-size:0.6rem;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:var(--text3);margin-bottom:8px}
+.slots-row{display:flex;gap:6px;flex-wrap:wrap}
+.slot-box{
+  flex:1;min-width:52px;max-width:80px;border-radius:8px;padding:8px 4px;text-align:center;
+  border:1px solid var(--border);background:var(--surface2);transition:all .35s;
+}
+.slot-box.filled{border-color:transparent}
+.slot-t{font-size:0.55rem;color:var(--text3);font-family:'JetBrains Mono',monospace;margin-bottom:5px;letter-spacing:.05em}
+.slot-v{font-size:0.85rem;font-weight:800;font-family:'Outfit',sans-serif}
+.slot-empty .slot-v{color:var(--border2)}
+@keyframes pop{0%{transform:scale(0.75);opacity:0}70%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
+.slot-pop{animation:pop .35s cubic-bezier(.34,1.56,.64,1)}
+
+/* ── PROC TABLE ── */
+.ptable{width:100%;border-collapse:collapse;font-size:0.75rem}
+.ptable th{
+  padding:7px 10px;text-align:left;font-size:0.58rem;font-weight:600;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);
+}
+.ptable td{padding:8px 10px;border-bottom:1px solid var(--border)}
+.ptable tr:last-child td{border-bottom:none}
+.ptable tr.row-live td{background:#f5a62308}
+.ptable tr.row-ok td{background:#52e5a008}
+.ptable tr.row-fail td{background:#ff5c5c08;opacity:.75}
+.ptable tr.row-wait td{color:var(--text3)}
+
+/* ── GANTT ── */
+.g-head{display:flex;gap:4px;padding-left:52px;margin-bottom:6px}
+.g-tl{flex:1;text-align:center;font-size:0.58rem;color:var(--text3);font-family:'JetBrains Mono',monospace}
+.g-row{display:flex;align-items:center;gap:4px;margin-bottom:5px}
+.g-jlbl{width:48px;font-size:0.65rem;font-weight:700;text-align:right;padding-right:4px;font-family:'JetBrains Mono',monospace;flex-shrink:0}
+.g-cells{display:flex;gap:4px;flex:1}
+.g-cell{
+  flex:1;height:38px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+  font-size:0.72rem;font-weight:800;border:1px solid transparent;
+  transition:all .4s;font-family:'Outfit',sans-serif;
+}
+.g-empty{background:var(--surface2);border-color:var(--border);color:var(--border2)}
+.g-filled{color:#fff}
+.g-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:1rem}
+.g-leg-item{display:flex;align-items:center;gap:5px;font-size:0.62rem;color:var(--text3)}
+.g-leg-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+
+/* ── CODE ── */
+.code-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.code-hdr{padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.code-lang{font-size:0.6rem;color:var(--text2);font-weight:600;letter-spacing:.12em;text-transform:uppercase;font-family:'JetBrains Mono',monospace}
+pre{padding:1.5rem;font-size:0.73rem;line-height:1.85;overflow-x:auto;font-family:'JetBrains Mono',monospace;color:var(--text)}
+pre::-webkit-scrollbar{height:3px}
+pre::-webkit-scrollbar-thumb{background:var(--border2)}
+.k{color:#c792ea}.f{color:var(--mint)}.c{color:var(--text3);font-style:italic}
+.s{color:#f07178}.n{color:var(--gold)}.v{color:#82aaff}
+
+/* ── AI COLUMN ── */
+.ai-col{display:flex;flex-direction:column;overflow:hidden}
+.chat-feed{flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:.75rem}
+.chat-feed::-webkit-scrollbar{width:3px}
+.chat-feed::-webkit-scrollbar-thumb{background:var(--border2)}
+
+.bubble{border-radius:10px;padding:.85rem 1rem;font-size:0.77rem;line-height:1.72;animation:bub .2s ease-out}
+@keyframes bub{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.bubble-user{
+  background:linear-gradient(135deg,#f5a62318,#f5a62308);
+  border:1px solid #f5a62328;border-radius:10px 10px 3px 10px;
+}
+.bubble-ai{background:var(--surface);border:1px solid var(--border);border-radius:10px 10px 10px 3px}
+.bub-who{font-size:0.58rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;margin-bottom:.35rem}
+.bub-who.you{color:var(--gold)}
+.bub-who.ai{color:var(--lavender)}
+
+.tblink{display:inline-block;width:2px;height:.9em;background:var(--lavender);margin-left:2px;vertical-align:text-bottom;animation:tb .75s steps(2) infinite}
+@keyframes tb{50%{opacity:0}}
+
+/* Quick Qs */
+.quick-row{padding:.75rem 1rem;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px;background:var(--surface);flex-shrink:0}
+.quick-label{font-size:0.56rem;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--text3)}
+.quick-chips{display:flex;flex-wrap:wrap;gap:5px}
+.qchip{
+  font-size:0.62rem;padding:4px 10px;border-radius:20px;cursor:pointer;
+  background:var(--surface2);border:1px solid var(--border);color:var(--text2);
+  transition:all .15s;font-family:'Outfit',sans-serif;font-weight:500;
+}
+.qchip:hover{border-color:var(--lavender);color:var(--lavender);background:#9b8ff512}
+
+/* Chat input */
+.chat-input-wrap{padding:.85rem 1rem;border-top:1px solid var(--border);background:var(--surface);display:flex;gap:8px;flex-shrink:0}
+.chat-inp{
+  flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+  padding:8px 12px;font-family:'Outfit',sans-serif;font-size:0.77rem;
+  color:var(--text);outline:none;transition:border-color .2s,box-shadow .2s;resize:none;max-height:80px;line-height:1.5;
+}
+.chat-inp:focus{border-color:var(--lavender);box-shadow:0 0 0 3px #9b8ff518}
+.chat-inp::placeholder{color:var(--text3)}
+
+/* Empty state */
+.empty-state{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.75rem;padding:2rem}
+.empty-icon{font-size:2.5rem;opacity:.18;line-height:1}
+.empty-txt{font-size:.78rem;color:var(--text3);text-align:center;line-height:1.6}
+.empty-cta{color:var(--gold);font-weight:600}
+
+/* Footer */
+.footer{height:36px;border-top:1px solid var(--border);background:#0f0e17f0;display:flex;align-items:center;padding:0 1.75rem;justify-content:space-between;flex-shrink:0}
+.footer-l{font-size:.6rem;color:var(--text3);letter-spacing:.08em}
+.footer-r{font-size:.6rem;color:var(--text3);font-family:'JetBrains Mono',monospace}
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="brand">Nexus<span class="brand-dot">·</span>Scheduler</div>
+  <div class="chips">
+    <span class="chip chip-gold">Greedy</span>
+    <span class="chip chip-lav">Job Sequencing</span>
+    <span class="chip chip-mint">DAA</span>
+  </div>
+  <div class="topbar-right">
+    <div class="ai-status"><div class="pulse-ring"></div>AI Engine Active</div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="grid">
+
+  <!-- ── COL 1: JOB MANAGER ── -->
+  <div class="col">
+    <div class="col-head">
+      <span class="col-title">Job Manager</span>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-ghost btn-xs" onclick="clearAll()">Clear</button>
+        <button class="btn btn-gold btn-sm" onclick="runAlgo()">▶ Run</button>
+      </div>
+    </div>
+    <div class="col-body">
+
+      <!-- Add job -->
+      <div>
+        <div class="sec-lbl">Add Job</div>
+        <div class="add-row">
+          <div class="field-group">
+            <div class="field-label">ID</div>
+            <input type="text" id="iId" placeholder="J1" maxlength="4">
+          </div>
+          <div class="field-group">
+            <div class="field-label">Deadline</div>
+            <input type="number" id="iDl" placeholder="2" min="1" max="20">
+          </div>
+          <div class="field-group">
+            <div class="field-label">Profit</div>
+            <input type="number" id="iPr" placeholder="100" min="1">
+          </div>
+        </div>
+        <div style="margin-top:8px">
+          <button class="btn btn-mint btn-sm" onclick="addJob()" style="width:100%">+ Add Job</button>
+        </div>
+      </div>
+
+      <!-- Presets -->
+      <div>
+        <div class="sec-lbl">Quick Load</div>
+        <div class="preset-chips">
+          <div class="preset-chip" onclick="loadPreset(0)">Classic ×5</div>
+          <div class="preset-chip" onclick="loadPreset(1)">Set B ×6</div>
+          <div class="preset-chip" onclick="loadPreset(2)">Large ×7</div>
+        </div>
+      </div>
+
+      <!-- Job list -->
+      <div>
+        <div class="sec-lbl">Jobs <span id="jcount" style="color:var(--gold)">(0)</span></div>
+        <div class="job-list" id="jobList">
+          <div class="empty-state" style="padding:1rem">
+            <div class="empty-icon">◫</div>
+            <div class="empty-txt">No jobs yet.<br>Add one or load a preset.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div id="resSection" style="display:none">
+        <div class="sec-lbl">Results</div>
+        <div class="results-grid">
+          <div class="res-tile"><div class="res-num lav" id="rSched">—</div><div class="res-lbl">Scheduled</div></div>
+          <div class="res-tile"><div class="res-num gold" id="rProfit">—</div><div class="res-lbl">Profit</div></div>
+          <div class="res-tile"><div class="res-num mint" id="rUtil">—</div><div class="res-lbl">Utilization</div></div>
+          <div class="res-tile"><div class="res-num red" id="rRej">—</div><div class="res-lbl">Rejected</div></div>
+        </div>
+        <div style="margin-top:10px">
+          <div class="sec-lbl">Complexity</div>
+          <div class="cx-table">
+            <div class="cx-row"><span class="cx-k">Time (basic)</span><span class="cx-v">O(n²)</span></div>
+            <div class="cx-row"><span class="cx-k">Time (DSU opt.)</span><span class="cx-v">O(n log n)</span></div>
+            <div class="cx-row"><span class="cx-k">Sorting step</span><span class="cx-v">O(n log n)</span></div>
+            <div class="cx-row"><span class="cx-k">Space</span><span class="cx-v">O(n)</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── COL 2: VISUALIZATION ── -->
+  <div class="col center-col">
+    <div class="tabs">
+      <div class="tab on" onclick="showTab('trace',this)">Trace</div>
+      <div class="tab" onclick="showTab('gantt',this)">Gantt</div>
+      <div class="tab" onclick="showTab('code',this)">Code</div>
+    </div>
+
+    <!-- TRACE -->
+    <div id="pane-trace" class="tab-pane on">
+      <div class="ctrl-bar">
+        <button class="btn btn-ghost btn-sm" onclick="resetTrace()">↺ Reset</button>
+        <button class="btn btn-outline btn-sm" id="btnStep" onclick="doStep()" disabled>Step →</button>
+        <button class="btn btn-mint btn-sm" id="btnAll" onclick="runAll()" disabled>Run All ⚡</button>
+        <span class="step-ctr" id="stepCtr">No run yet</span>
+      </div>
+
+      <div id="statusCard" class="status-card" style="display:none">
+        <div id="statusMsg"></div>
+      </div>
+
+      <div class="slots-wrap" id="slotsWrap" style="display:none">
+        <div class="slots-label">Time Slots</div>
+        <div class="slots-row" id="slotsRow"></div>
+      </div>
+
+      <div id="ptableWrap" style="display:none">
+        <div class="sec-lbl" style="margin-bottom:8px">Processing Order (profit ↓)</div>
+        <table class="ptable">
+          <thead><tr><th>#</th><th>Job</th><th>Deadline</th><th>Profit</th><th>Status</th></tr></thead>
+          <tbody id="ptBody"></tbody>
+        </table>
+      </div>
+
+      <div id="traceEmpty" class="empty-state">
+        <div class="empty-icon">⟳</div>
+        <div class="empty-txt">Add jobs then click <span class="empty-cta">▶ Run</span><br>to start the algorithm trace.</div>
+      </div>
+    </div>
+
+    <!-- GANTT -->
+    <div id="pane-gantt" class="tab-pane">
+      <div id="ganttContent" style="display:none"></div>
+      <div id="ganttEmpty" class="empty-state">
+        <div class="empty-icon">▦</div>
+        <div class="empty-txt">Run the algorithm to<br>see the Gantt chart.</div>
+      </div>
+    </div>
+
+    <!-- CODE -->
+    <div id="pane-code" class="tab-pane">
+      <div class="code-card">
+        <div class="code-hdr">
+          <span class="code-lang">Python 3 — Job Sequencing · Greedy</span>
+          <button class="btn btn-ghost btn-xs" onclick="cpyCode()">copy</button>
+        </div>
+<pre id="codeEl"><span class="c"># ══════════════════════════════════════════════════
+#  Job Scheduling — Greedy Algorithm (DAA)
+#  Greedy Choice: highest-profit job first
+#  Time: O(n²)  |  Space: O(n)
+# ══════════════════════════════════════════════════</span>
+
+<span class="k">def</span> <span class="f">job_sequencing</span>(jobs):
+    <span class="s">"""
+    Maximize total profit by scheduling jobs
+    before their respective deadlines.
+
+    jobs: list of dict {id, deadline, profit}
+    returns: (scheduled, timeline, total_profit)
+    """</span>
+
+    <span class="c"># Step 1 — Sort by profit descending (greedy key)</span>
+    <span class="v">sorted_jobs</span> = <span class="f">sorted</span>(
+        jobs,
+        key=<span class="k">lambda</span> j: j[<span class="s">'profit'</span>],
+        reverse=<span class="k">True</span>
+    )
+
+    <span class="v">max_d</span>  = <span class="f">max</span>(j[<span class="s">'deadline'</span>] <span class="k">for</span> j <span class="k">in</span> jobs)
+    <span class="v">slot</span>   = [<span class="k">None</span>] * (<span class="v">max_d</span> + <span class="n">1</span>)   <span class="c"># 1-indexed</span>
+    <span class="v">done</span>   = []
+    <span class="v">profit</span> = <span class="n">0</span>
+
+    <span class="c"># Step 2 — Greedy assignment</span>
+    <span class="k">for</span> <span class="v">job</span> <span class="k">in</span> <span class="v">sorted_jobs</span>:
+        <span class="c"># Scan latest free slot ≤ deadline</span>
+        <span class="k">for</span> <span class="v">t</span> <span class="k">in</span> <span class="f">range</span>(<span class="v">job</span>[<span class="s">'deadline'</span>], <span class="n">0</span>, -<span class="n">1</span>):
+            <span class="k">if</span> <span class="v">slot</span>[<span class="v">t</span>] <span class="k">is</span> <span class="k">None</span>:
+                <span class="v">slot</span>[<span class="v">t</span>] = <span class="v">job</span>[<span class="s">'id'</span>]
+                <span class="v">done</span>.<span class="f">append</span>(<span class="v">job</span>)
+                <span class="v">profit</span> += <span class="v">job</span>[<span class="s">'profit'</span>]
+                <span class="k">break</span>
+
+    <span class="k">return</span> <span class="v">done</span>, <span class="v">slot</span>[<span class="n">1</span>:], <span class="v">profit</span>
+
+
+<span class="c"># ── Example run ────────────────────────────────</span>
+<span class="k">if</span> __name__ == <span class="s">'__main__'</span>:
+    <span class="v">jobs</span> = [
+        {<span class="s">'id'</span>:<span class="s">'J1'</span>, <span class="s">'deadline'</span>:<span class="n">2</span>, <span class="s">'profit'</span>:<span class="n">100</span>},
+        {<span class="s">'id'</span>:<span class="s">'J2'</span>, <span class="s">'deadline'</span>:<span class="n">1</span>, <span class="s">'profit'</span>: <span class="n">80</span>},
+        {<span class="s">'id'</span>:<span class="s">'J3'</span>, <span class="s">'deadline'</span>:<span class="n">2</span>, <span class="s">'profit'</span>: <span class="n">60</span>},
+        {<span class="s">'id'</span>:<span class="s">'J4'</span>, <span class="s">'deadline'</span>:<span class="n">1</span>, <span class="s">'profit'</span>: <span class="n">40</span>},
+        {<span class="s">'id'</span>:<span class="s">'J5'</span>, <span class="s">'deadline'</span>:<span class="n">3</span>, <span class="s">'profit'</span>: <span class="n">20</span>},
+    ]
+    <span class="v">sched</span>, <span class="v">timeline</span>, <span class="v">total</span> = <span class="f">job_sequencing</span>(<span class="v">jobs</span>)
+    <span class="f">print</span>(<span class="s">f"Scheduled : {[j['id'] for j in sched]}"</span>)
+    <span class="f">print</span>(<span class="s">f"Timeline  : {timeline}"</span>)
+    <span class="f">print</span>(<span class="s">f"Profit    : ₹{total}"</span>)
+    <span class="c"># Scheduled : ['J1', 'J2', 'J5']
+    # Timeline  : ['J2', 'J1', 'J5']
+    # Profit    : ₹200</span>
+</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── COL 3: AI ASSISTANT ── -->
+  <div class="col ai-col">
+    <div class="col-head">
+      <span class="col-title">AI Assistant</span>
+      <span class="chip chip-lav" style="font-size:.56rem">DAA Expert</span>
+    </div>
+
+    <div class="chat-feed" id="chatFeed">
+      <div class="bubble bubble-ai" style="border-color:var(--border2)">
+        <div class="bub-who ai">AI Assistant</div>
+        Hello! I'm your DAA expert for Job Sequencing. Ask me about greedy algorithm theory, time complexity, correctness proofs, or your current dataset. Use the quick prompts below to get started.
+      </div>
+    </div>
+
+    <div class="quick-row">
+      <div class="quick-label">Quick Questions</div>
+      <div class="quick-chips">
+        <div class="qchip" onclick="ask('What is the greedy choice property in job sequencing?')">Greedy property</div>
+        <div class="qchip" onclick="ask('Why do we scan slots backwards from the deadline?')">Backward scan</div>
+        <div class="qchip" onclick="ask('Prove the greedy algorithm gives an optimal solution')">Optimality proof</div>
+        <div class="qchip" onclick="ask('Explain Union-Find optimization to reduce O(n²) to O(n log n)')">DSU optimization</div>
+        <div class="qchip" onclick="askMyData()">Analyze my jobs</div>
+      </div>
+    </div>
+
+    <div class="chat-input-wrap">
+      <textarea class="chat-inp" id="chatInp" placeholder="Ask about the algorithm…" rows="1"
+        onkeydown="if((ev=event).key==='Enter'&&!ev.shiftKey){ev.preventDefault();sendMsg()}"></textarea>
+      <button class="btn btn-outline btn-sm" id="sendBtn" onclick="sendMsg()">→</button>
+    </div>
+  </div>
+
+</div><!-- grid -->
+
+<div class="footer">
+  <span class="footer-l">Design and Analysis of Algorithms · Greedy Paradigm · Job Sequencing with Deadlines</span>
+  <span class="footer-r">AI-powered · streaming · real-time</span>
+</div>
+
+</div><!-- shell -->
+
+<script>
+// ─── PALETTE ───────────────────────────────────────────────────────
+const PAL = ['#f5a623','#4ecdc4','#9b8ff5','#ff6b8a','#52e5a0','#ffc65a','#74b9ff','#fd79a8','#55efc4','#e17055'];
+let jobs = [], algoState = null, aiStreaming = false;
+
+const PRESETS = [
+  [{id:'J1',deadline:2,profit:100},{id:'J2',deadline:1,profit:80},{id:'J3',deadline:2,profit:60},{id:'J4',deadline:1,profit:40},{id:'J5',deadline:3,profit:20}],
+  [{id:'A',deadline:4,profit:200},{id:'B',deadline:1,profit:150},{id:'C',deadline:2,profit:120},{id:'D',deadline:2,profit:90},{id:'E',deadline:3,profit:60},{id:'F',deadline:4,profit:30}],
+  [{id:'P',deadline:5,profit:500},{id:'Q',deadline:1,profit:400},{id:'R',deadline:3,profit:300},{id:'S',deadline:2,profit:200},{id:'T',deadline:2,profit:100},{id:'U',deadline:4,profit:80},{id:'V',deadline:5,profit:60}],
+];
+
+function colorOf(id){ const i = jobs.findIndex(j=>j.id===id); return PAL[Math.max(i,0)%PAL.length]; }
+
+// ─── JOB CRUD ──────────────────────────────────────────────────────
+function addJob(){
+  const id=document.getElementById('iId').value.trim().toUpperCase();
+  const dl=parseInt(document.getElementById('iDl').value);
+  const pr=parseInt(document.getElementById('iPr').value);
+  if(!id||isNaN(dl)||isNaN(pr)||dl<1||pr<1){alert('Please fill all fields correctly.');return;}
+  if(jobs.find(j=>j.id===id)){alert('Job ID already exists.');return;}
+  jobs.push({id,deadline:dl,profit:pr});
+  ['iId','iDl','iPr'].forEach(x=>document.getElementById(x).value='');
+  renderJobs(); resetTrace();
+}
+function removeJob(id){ jobs=jobs.filter(j=>j.id!==id); renderJobs(); resetTrace(); }
+function clearAll(){ jobs=[]; renderJobs(); resetTrace(); }
+function loadPreset(n){ jobs=PRESETS[n].map(j=>({...j})); renderJobs(); resetTrace(); }
+
+function renderJobs(){
+  const el=document.getElementById('jobList');
+  document.getElementById('jcount').textContent=`(${jobs.length})`;
+  if(!jobs.length){
+    el.innerHTML='<div class="empty-state" style="padding:1rem"><div class="empty-icon">◫</div><div class="empty-txt">No jobs yet.<br>Add one or load a preset.</div></div>';
+    return;
+  }
+  el.innerHTML=jobs.map(j=>`
+    <div class="job-row">
+      <div class="job-color" style="background:${colorOf(j.id)}"></div>
+      <div class="job-name" style="color:${colorOf(j.id)}">${j.id}</div>
+      <div class="job-meta">
+        <span>D≤T${j.deadline}</span>
+        <span style="color:var(--gold)">₹${j.profit}</span>
+      </div>
+      <button class="del" onclick="removeJob('${j.id}')">✕</button>
+    </div>`).join('');
+}
+
+// ─── ALGORITHM ─────────────────────────────────────────────────────
+async function runAlgo() {
+  if (!jobs.length) {
+    alert("Add at least one job first.");
+    return;
+  }
+
+  // 🔥 1. RUN FRONTEND ALGORITHM (for Trace + Gantt)
+  const sorted = [...jobs].sort((a, b) => b.profit - a.profit);
+  const maxD = Math.max(...jobs.map(j => j.deadline));
+
+  algoState = {
+    sorted,
+    slots: new Array(maxD + 1).fill(null),
+    maxD,
+    step: 0,
+    history: [],
+    finished: false
+  };
+
+  document.getElementById('traceEmpty').style.display = 'none';
+  document.getElementById('statusCard').style.display = 'block';
+  document.getElementById('slotsWrap').style.display = 'block';
+  document.getElementById('ptableWrap').style.display = 'block';
+
+  document.getElementById('btnStep').disabled = false;
+  document.getElementById('btnAll').disabled = false;
+
+  renderProcTable();
+  renderSlots();
+
+  // 🔥 2. ALSO CALL BACKEND (for result verification)
+  try {
+    const res = await fetch("/schedule", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ jobs })
+    });
+
+    const data = await res.json();
+
+    console.log("Backend result:", data);
+
+  } catch (err) {
+    console.log("Backend not connected");
+  }
+}
+function doStep(){
+  if(!algoState||algoState.finished) return;
+  const {sorted,slots,maxD}=algoState;
+  const i=algoState.step;
+  if(i>=sorted.length){finish();return;}
+  const job=sorted[i];
+  let placed=false,at=-1;
+  for(let t=job.deadline;t>=1;t--){if(!slots[t]){slots[t]=job.id;placed=true;at=t;break;}}
+  algoState.history.push({job,placed,at});
+  algoState.step++;
+  const card=document.getElementById('statusCard');
+  const msg=document.getElementById('statusMsg');
+  if(placed){
+    card.className='status-card ok';
+    msg.innerHTML=`Considering <span class="hi-gold">${job.id}</span> (profit ₹${job.profit}, deadline T${job.deadline}) → Free slot at <span class="hi-green">T${at}</span> → <span class="hi-green">✓ Scheduled</span>`;
+  } else {
+    card.className='status-card fail';
+    msg.innerHTML=`Considering <span class="hi-gold">${job.id}</span> (profit ₹${job.profit}, deadline T${job.deadline}) → No free slot ≤ T${job.deadline} → <span class="hi-red">✗ Rejected</span>`;
+  }
+  document.getElementById('stepCtr').textContent=`${algoState.step} / ${sorted.length}`;
+  renderProcTable(); renderSlots();
+  if(algoState.step>=sorted.length) finish();
+}
+
+function runAll(){
+  if(!algoState) return;
+  while(algoState.step < algoState.sorted.length){
+    doStep();
+  }
+}
+    
+function finish(){
+  algoState.finished=true;
+  document.getElementById('btnStep').disabled=true;
+  document.getElementById('btnAll').disabled=true;
+  const sc=algoState.history.filter(h=>h.placed);
+  const profit=sc.reduce((s,h)=>s+h.job.profit,0);
+  const rej=algoState.history.filter(h=>!h.placed);
+  const util=Math.round(sc.length/algoState.maxD*100);
+  const card=document.getElementById('statusCard');
+  card.className='status-card done';
+  document.getElementById('statusMsg').innerHTML=`<span class="hi-lav">✓ Complete.</span> Scheduled <span class="hi-gold">${sc.length}</span> jobs · Total profit <span class="hi-gold">₹${profit}</span> · <span class="hi-red">${rej.length} rejected</span>.`;
+  document.getElementById('stepCtr').textContent=`Done — ${sc.length}/${algoState.sorted.length} scheduled`;
+  document.getElementById('resSection').style.display='block';
+  document.getElementById('rSched').textContent=`${sc.length}/${algoState.sorted.length}`;
+  document.getElementById('rProfit').textContent=`₹${profit}`;
+  document.getElementById('rUtil').textContent=`${util}%`;
+  document.getElementById('rRej').textContent=rej.length;
+  renderGantt();
+}
+
+function resetTrace(){
+  algoState=null;
+  ['statusCard','slotsWrap','ptableWrap'].forEach(id=>document.getElementById(id).style.display='none');
+  document.getElementById('traceEmpty').style.display='flex';
+  document.getElementById('btnStep').disabled=true;
+  document.getElementById('btnAll').disabled=true;
+  document.getElementById('stepCtr').textContent='No run yet';
+  document.getElementById('resSection').style.display='none';
+  document.getElementById('ganttContent').style.display='none';
+  document.getElementById('ganttEmpty').style.display='flex';
+}
+
+function renderProcTable(){
+  if(!algoState) return;
+  const {sorted,step,history}=algoState;
+  document.getElementById('ptBody').innerHTML=sorted.map((j,i)=>{
+    let cls='row-wait',st='—';
+    if(i<step){ const h=history[i]; cls=h.placed?'row-ok':'row-fail'; st=h.placed?`<span style="color:var(--success)">T${h.at} ✓</span>`:`<span style="color:var(--danger)">✗ Rejected</span>`; }
+    else if(i===step){ cls='row-live'; st=`<span style="color:var(--gold)">⟶ Now</span>`; }
+    return `<tr class="${cls}"><td style="color:var(--text3)">${i+1}</td>
+      <td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${colorOf(j.id)};margin-right:6px;vertical-align:middle"></span><strong style="color:${colorOf(j.id)}">${j.id}</strong></td>
+      <td>T${j.deadline}</td><td style="color:var(--gold)">₹${j.profit}</td><td>${st}</td></tr>`;
+  }).join('');
+}
+
+function renderSlots(){
+  if(!algoState) return;
+  const {slots,maxD}=algoState;
+  const row=document.getElementById('slotsRow');
+  row.innerHTML='';
+  for(let t=1;t<=maxD;t++){
+    const jid=slots[t];
+    const el=document.createElement('div');
+    el.className='slot-box'+(jid?' filled slot-pop':' slot-empty');
+    if(jid){el.style.background=colorOf(jid)+'22';el.style.borderColor=colorOf(jid)+'55';}
+    el.innerHTML=`<div class="slot-t">T${t}</div><div class="slot-v" style="color:${jid?colorOf(jid):'var(--border2)'}">${jid||'—'}</div>`;
+    row.appendChild(el);
+  }
+}
+
+function renderGantt(){
+  if(!algoState) return;
+  const {slots,maxD,sorted}=algoState;
+  document.getElementById('ganttEmpty').style.display='none';
+  const gc=document.getElementById('ganttContent');
+  gc.style.display='block';
+  let html=`<div style="margin-bottom:.75rem;font-size:.72rem;color:var(--text3)">Filled cell = job occupies that time slot</div>`;
+  html+=`<div class="g-head">`;
+  for(let t=1;t<=maxD;t++) html+=`<div class="g-tl">T${t}</div>`;
+  html+=`</div>`;
+  sorted.forEach(j=>{
+    html+=`<div class="g-row"><div class="g-jlbl" style="color:${colorOf(j.id)}">${j.id}</div><div class="g-cells">`;
+    for(let t=1;t<=maxD;t++){
+      if(slots[t]===j.id) html+=`<div class="g-cell g-filled" style="background:${colorOf(j.id)};box-shadow:0 0 12px ${colorOf(j.id)}44">${j.id}</div>`;
+      else html+=`<div class="g-cell g-empty">·</div>`;
+    }
+    html+=`</div></div>`;
+  });
+  html+=`<div class="g-legend">`;
+  sorted.forEach(j=>{ html+=`<div class="g-leg-item"><div class="g-leg-dot" style="background:${colorOf(j.id)}"></div>${j.id} · D≤${j.deadline} · ₹${j.profit}</div>`; });
+  html+=`</div>`;
+  gc.innerHTML=html;
+}
+
+// ─── TABS ──────────────────────────────────────────────────────────
+function showTab(id,el){
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  document.getElementById('pane-'+id).classList.add('on');
+  if(el) el.classList.add('on');
+}
+
+// ─── AI CHAT ───────────────────────────────────────────────────────
+async function sendMsg(){
+  const inp=document.getElementById('chatInp');
+  const txt=inp.value.trim();
+  if(!txt||aiStreaming) return;
+  inp.value='';
+  await ask(txt);
+}
+
+async function askMyData(){
+  const jobStr=jobs.length?jobs.map(j=>`${j.id}(D=${j.deadline},P=₹${j.profit})`).join(', '):'none added';
+  let q=`My current jobs: ${jobStr}.`;
+  if(algoState&&algoState.finished){
+    const sc=algoState.history.filter(h=>h.placed);
+    const profit=sc.reduce((s,h)=>s+h.job.profit,0);
+    q+=` The greedy algorithm scheduled ${sc.map(h=>h.job.id).join(', ')} with profit ₹${profit}. Is this optimal? Could any rearrangement improve it?`;
+  } else { q+=' Walk me through what the greedy algorithm would schedule and why.'; }
+  await ask(q);
+}
+
+async function ask(question){
+  if(aiStreaming) return;
+
+  aiStreaming = true;
+  document.getElementById('sendBtn').disabled = true;
+
+  const feed = document.getElementById('chatFeed');
+
+  // User message
+  const uDiv = document.createElement('div');
+  uDiv.className = 'bubble bubble-user';
+  uDiv.innerHTML = `<div class="bub-who you">You</div>${question}`;
+  feed.appendChild(uDiv);
+
+  // AI response
+  const aDiv = document.createElement('div');
+  aDiv.className = 'bubble bubble-ai';
+  aDiv.innerHTML = `<div class="bub-who ai">AI Assistant</div>Typing...`;
+  feed.appendChild(aDiv);
+
+  try {
+    const res = await fetch("/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ message: question })
+    });
+
+    const data = await res.json();
+
+    aDiv.innerHTML = `<div class="bub-who ai">AI Assistant</div>${data.reply}`;
+
+  } catch (err) {
+    aDiv.innerHTML = `<div class="bub-who ai">AI Assistant</div><span style="color:red">Server error</span>`;
+  }
+
+  aiStreaming = false;
+  document.getElementById('sendBtn').disabled = false;
+  feed.scrollTop = feed.scrollHeight;
+}
+
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')}
+
+function cpyCode(){
+  navigator.clipboard.writeText(document.getElementById('codeEl').innerText).then(()=>{
+    const b=document.querySelector('.code-hdr .btn');b.textContent='Copied!';
+    setTimeout(()=>b.textContent='copy',1500);
+  });
+}
+
+// ─── INIT ──────────────────────────────────────────────────────────
+loadPreset(0);
+document.getElementById('ganttEmpty').style.display='flex';
+</script>
+</body>
+</html>
